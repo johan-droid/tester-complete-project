@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tester - AI-Powered Evaluation</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+  <link rel="stylesheet" href="src/css/style.css">
+  <link rel="stylesheet" href="src/css/responsive.css">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container header-container">
+            <div class="logo">
+                <i class="fas fa-graduation-cap"></i>
+                <h1>Tester</h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#problem">Problem</a></li>
+                    <li><a href="#objectives">Objectives</a></li>
+                    <li><a href="#dashboard">Dashboard</a></li>
+                    <li><a href="#team">Team</a></li>
+                    <li><a href="#roadmap">Roadmap</a></li>
+                </ul>
+            </nav>
+            <div class="auth-buttons">
+                <button id="loginBtn" class="auth-btn">Login</button>
+                <button id="registerBtn" class="auth-btn primary">Sign Up</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Auth Modals -->
+    <div id="authModals" class="modals-container">
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Login to Tester</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="cta-button">Login</button>
+                </form>
+                <p>Don't have an account? <a href="#" id="showRegister">Sign up</a></p>
+            </div>
+        </div>
+
+        <!-- Register Modal -->
+        <div id="registerModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Create Account</h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="registerName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="registerEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="registerRole">
+                            <option value="student">Student</option>
+                            <option value="teacher">Teacher</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="cta-button">Create Account</button>
+                </form>
+                <p>Already have an account? <a href="#" id="showLogin">Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container hero-content">
+            <h2>Intelligent Mock Test & Answer Evaluation System</h2>
+            <p>Revolutionizing education with AI-powered test generation and evaluation for both typed and handwritten answers</p>
+            <div class="hero-buttons">
+                <a href="#features" class="cta-button">Explore Features</a>
+                <button id="demoBtn" class="cta-button secondary">Live Demo</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>Key Features</h2>
+                <p>Discover how Tester transforms the educational assessment process with cutting-edge technology</p>
+            </div>
+            <div class="features-grid">
+                <!-- Feature cards will be populated by JavaScript -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem Context Section -->
+    <section id="problem" class="problem">
+        <div class="container">
+            <div class="section-title">
+                <h2>Problem Context</h2>
+                <p>Understanding the challenges in modern educational assessment</p>
+            </div>
+            <div class="problem-content">
+                <div class="problem-text">
+                    <h2>The Growing Need for Automated Assessment Systems</h2>
+                    <p>With the increasing reliance on digital learning resources, there is a growing need for automated systems that can generate mock tests and evaluate student responses efficiently.</p>
+                    <p>Traditional mock test creation is manual, time-consuming, and often lacks adaptive feedback mechanisms that can personalize learning.</p>
+                    <p>Additionally, evaluating handwritten answer scripts remains a significant challenge due to varying handwriting styles, formatting, and quality of scanned documents.</p>
+                </div>
+                <div class="problem-image">
+                    <h3>The Challenge</h3>
+                    <p>This limitation reduces the scalability and efficiency of existing assessment platforms, especially in educational environments where both typed and handwritten submissions are common.</p>
+                    <p>Tester addresses these challenges with innovative AI solutions that streamline the entire assessment process.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Objectives Section -->
+    <section id="objectives" class="objectives">
+        <div class="container">
+            <div class="section-title">
+                <h2>Project Objectives</h2>
+                <p>Clear goals driving the development of Tester</p>
+            </div>
+            <div class="objectives-grid">
+                <!-- Objectives will be populated by JavaScript -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Preview -->
+    <section id="dashboard" class="dashboard">
+        <div class="container">
+            <div class="section-title">
+                <h2>Performance Dashboard</h2>
+                <p>Track and analyze student performance with comprehensive analytics</p>
+            </div>
+            <div class="dashboard-preview">
+                <div class="dashboard-header">
+                    <h3>Student Performance Overview</h3>
+                    <div class="filters">
+                        <select id="timeFilter">
+                            <option>Last 7 days</option>
+                            <option>Last 30 days</option>
+                            <option>Last 3 months</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="dashboard-content">
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <h4>Average Score</h4>
+                            <p id="avgScore">78%</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Tests Completed</h4>
+                            <p id="testsCompleted">24</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Weak Areas</h4>
+                            <p id="weakAreas">3 Topics</p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Improvement</h4>
+                            <p id="improvement">+12%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team Section -->
+    <section id="team" class="team">
+        <div class="container">
+            <div class="section-title">
+                <h2>Our Team</h2>
+                <p>The talented individuals behind Tester</p>
+            </div>
+            <div class="team-grid">
+                <!-- Team members will be populated by JavaScript -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap Section -->
+    <section id="roadmap" class="roadmap">
+        <div class="container">
+            <div class="section-title">
+                <h2>Future Roadmap</h2>
+                <p>What's next for Tester?</p>
+            </div>
+            <div class="roadmap-content">
+                <!-- Roadmap items will be populated by JavaScript -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer id="contact">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>Tester</h3>
+                    <p>Intelligent Mock Test & Answer Evaluation System revolutionizing education through AI-powered assessment.</p>
+                </div>
+                <div class="footer-column">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#problem">Problem Context</a></li>
+                        <li><a href="#objectives">Objectives</a></li>
+                        <li><a href="#dashboard">Dashboard</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Team Members</h3>
+                    <ul id="teamList">
+                        <!-- Team list will be populated by JavaScript -->
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Contact</h3>
+                    <ul>
+                        <li><i class="fas fa-envelope"></i> contact@tester.com</li>
+                        <li><i class="fas fa-phone"></i> +1 (555) 123-4567</li>
+                        <li><i class="fas fa-map-marker-alt"></i> Educational Technology Hub</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2023 Tester - Intelligent Mock Test & Answer Evaluation System. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script src="src/js/api.js"></script>
+  <script src="src/js/animation.js"></script>
+  <script src="src/js/main.js"></script>
+  <script src="src/js/dashboard.js"></script>
+
+</body>
+</html>
