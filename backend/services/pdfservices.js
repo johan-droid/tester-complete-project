@@ -106,39 +106,24 @@ class PDFService {
     static async extractQuestions(pdfPath) {
         try {
             const dataBuffer = fs.readFileSync(pdfPath);
-            let data = await pdf(dataBuffer);
+            const data = await pdf(dataBuffer);
             let text = data.text.trim();
 
-            // --- FIX: Scanned PDF / OCR Fallback ---
-            // If text is very short/empty, it's likely a scanned image PDF.
+            // ✅ DEBUG LOG: Check if text was actually found
+            console.log(`PDF Text Length: ${text.length} characters`);
+
+            // Check if PDF is empty or scanned (image-based)
             if (text.length < 50) {
-                console.log("Text layer empty. Attempting OCR...");
-                
-                // NOTE: To make this work fully, you need a library like 'pdf-img-convert' 
-                // to convert the PDF pages to image buffers/files first.
-                // Since I cannot install packages for you, this is the logic flow:
-                
-                /* const pdf2pic = require('pdf-img-convert'); // You would need to install this
-                const imageBuffers = await pdf2pic.convert(pdfPath);
-                
-                // Process images with your existing OCRService
-                const ocrResults = await Promise.all(
-                    imageBuffers.map(async (buffer, index) => {
-                        // Save buffer to temp file or modify OCRService to accept buffers
-                        const tempPath = `temp_page_${index}.png`;
-                        fs.writeFileSync(tempPath, buffer);
-                        const pageText = await OCRService.extractText(tempPath);
-                        fs.unlinkSync(tempPath); // Clean up
-                        return pageText;
-                    })
-                );
-                text = ocrResults.join(' ');
-                */
-                
-                // If you don't have the conversion library yet, throw a clear error
-                if (text.length === 0) {
-                     throw new Error("This appears to be a scanned PDF. Please install 'pdf-img-convert' to enable OCR features.");
-                }
+                console.warn("⚠️ Text layer is empty. This might be a scanned PDF.");
+                // Return a dummy question so the frontend doesn't crash/do nothing
+                return [{
+                    question: "Error: The uploaded PDF appears to be a scanned image. Please upload a PDF with selectable text.",
+                    type: "short-answer",
+                    difficulty: "easy",
+                    subject: "System",
+                    topic: "Error",
+                    marks: 0
+                }];
             }
 
             // --- FIX: Chunking & Parallel Processing ---

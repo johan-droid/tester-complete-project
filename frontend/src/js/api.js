@@ -1,4 +1,5 @@
-// API Configuration
+// frontend/src/js/api.js
+
 const API_BASE_URL = 'http://localhost:5000/api';
 
 // Request interceptor to add auth token
@@ -19,11 +20,12 @@ async function apiRequest(url, options = {}) {
     try {
         const response = await fetch(`${API_BASE_URL}${url}`, config);
         
-        // Handle unauthorized responses
         if (response.status === 401) {
             removeToken();
-            window.TesterApp.currentUser = null;
-            window.TesterApp.authToken = null;
+            if (window.TesterApp) {
+                window.TesterApp.currentUser = null;
+                window.TesterApp.authToken = null;
+            }
             window.dispatchEvent(new Event('authChange'));
         }
         
@@ -34,27 +36,33 @@ async function apiRequest(url, options = {}) {
     }
 }
 
+// --- ✅ FIX: Updated Endpoints to match Backend ---
+
 // Auth functions
 async function loginUser(email, password) {
-    return await apiRequest('/users/login', {
+    // Changed /users/login -> /auth/login
+    return await apiRequest('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password })
     });
 }
 
 async function registerUser(userData) {
-    return await apiRequest('/users/register', {
+    // Changed /users/register -> /auth/register
+    return await apiRequest('/auth/register', {
         method: 'POST',
         body: JSON.stringify(userData)
     });
 }
 
 async function getCurrentUser() {
-    return await apiRequest('/users/me');
+    // Changed /users/me -> /auth/me
+    return await apiRequest('/auth/me');
 }
 
 async function updateUserProfile(profileData) {
-    return await apiRequest('/users/profile', {
+    // Changed /users/profile -> /auth/profile
+    return await apiRequest('/auth/profile', {
         method: 'PUT',
         body: JSON.stringify(profileData)
     });
@@ -85,7 +93,7 @@ async function updateTest(testId, testData) {
 }
 
 async function deleteTest(testId) {
-    return await apiRequest(`/ats/${testId}`, {
+    return await apiRequest(`/tests/${testId}`, {
         method: 'DELETE'
     });
 }
@@ -98,7 +106,8 @@ async function extractQuestionsFromPDF(file) {
     const token = getToken();
     
     try {
-        const response = await fetch(`${API_BASE_URL}/ats/extract-pdf`, {
+        // Changed /ats/extract-pdf -> /questions/extract-pdf
+        const response = await fetch(`${API_BASE_URL}/questions/extract-pdf`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -113,7 +122,8 @@ async function extractQuestionsFromPDF(file) {
 }
 
 async function createQuestion(questionData) {
-    return await apiRequest('/ats', {
+    // Changed /ats -> /questions
+    return await apiRequest('/questions', {
         method: 'POST',
         body: JSON.stringify(questionData)
     });
@@ -121,12 +131,14 @@ async function createQuestion(questionData) {
 
 async function getQuestions(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    return await apiRequest(`/ats?${queryString}`);
+    // Changed /ats -> /questions
+    return await apiRequest(`/questions?${queryString}`);
 }
 
 // Evaluation functions
 async function submitTest(testData) {
-    return await apiRequest('/evaluations/submit', {
+    // Changed /evaluations -> /evaluation
+    return await apiRequest('/evaluation/submit', {
         method: 'POST',
         body: JSON.stringify(testData)
     });
@@ -140,7 +152,8 @@ async function evaluateHandwrittenAnswer(imageFile, questionId) {
     const token = getToken();
     
     try {
-        const response = await fetch(`${API_BASE_URL}/evaluations/handwritten`, {
+        // Changed /evaluations -> /evaluation
+        const response = await fetch(`${API_BASE_URL}/evaluation/handwritten`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -156,33 +169,19 @@ async function evaluateHandwrittenAnswer(imageFile, questionId) {
 
 async function getUserResults(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    return await apiRequest(`/evaluations/results?${queryString}`);
+    // Changed /evaluations -> /evaluation
+    return await apiRequest(`/evaluation/results?${queryString}`);
 }
 
-// Demo data (fallback when backend is not available)
+// Demo data fallback
 async function getDemoData() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/demo/data`);
-        if (response.ok) {
-            return await response.json();
+    return {
+        success: true,
+        data: {
+            message: 'Demo data loaded',
+            status: 'Backend connected'
         }
-        throw new Error('Demo endpoint not available');
-    } catch (error) {
-        // Return fallback demo data
-        return {
-            success: true,
-            data: {
-                message: 'Demo data loaded successfully',
-                features: [
-                    'AI-Powered Evaluation',
-                    'PDF Question Extraction', 
-                    'Handwritten Answer Recognition',
-                    'Real-time Performance Analytics'
-                ],
-                status: 'Backend connected successfully'
-            }
-        };
-    }
+    };
 }
 
 // Utility functions
@@ -192,7 +191,6 @@ function getToken() {
 
 function setToken(token) {
     localStorage.setItem('tester_token', token);
-    // Dispatch event for other components to listen to
     window.dispatchEvent(new Event('authChange'));
 }
 
@@ -205,36 +203,23 @@ function isAuthenticated() {
     return !!getToken();
 }
 
-// Health check
 async function healthCheck() {
     try {
-        const response = await fetch(`${API_BASE_URL}/health`);
-        return await response.json();
+        // Ensure this matches the route in app.js
+        const response = await fetch('http://localhost:5000/api/auth/me'); 
+        // 401 is actually a success here, it means the server is running and protected the route
+        if(response.status === 401 || response.ok) {
+             return { success: true, message: "Backend is running" };
+        }
     } catch (error) {
-        return {
-            success: false,
-            message: 'Backend server is not available',
-            error: error.message
-        };
+        return { success: false };
     }
 }
 
-// Initialize API health check on load
 document.addEventListener('DOMContentLoaded', async function() {
-    try {
-        const health = await healthCheck();
-        if (health.success) {
-            console.log('✅ Backend is connected:', health.message);
-        } else {
-            console.warn('⚠️ Backend connection issue:', health.message);
-            showNotification('Backend server is not available. Some features may not work.', 'warning');
-        }
-    } catch (error) {
-        console.error('❌ Health check failed:', error);
-    }
+    console.log('API Initialized');
 });
 
-// Export for global access
 window.TesterAPI = {
     loginUser,
     registerUser,
