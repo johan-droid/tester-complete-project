@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Parser - Tester</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="src/css/style.css">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --gradient: linear-gradient(135deg, #3498db, #2c3e50);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f9f9f9;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .parser-container {
+            min-height: 100vh;
+            background: var(--gradient);
+            padding: 2rem 0;
+        }
+        
+        .parser-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+        }
+        
+        .parser-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .parser-header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .parser-main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        
+        .upload-section, .results-section {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-title i {
+            color: var(--secondary);
+        }
+        
+        .upload-area {
+            border: 3px dashed var(--secondary);
+            border-radius: 15px;
+            padding: 3rem;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover, .upload-area.drag-over {
+            border-color: var(--primary);
+            background: #e3f2fd;
+            transform: translateY(-2px);
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            color: var(--accent);
+            margin-bottom: 1.5rem;
+        }
+        
+        .upload-text h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .upload-text p {
+            color: #7f8c8d;
+            margin-bottom: 1.5rem;
+        }
+        
+        .upload-btn {
+            background: var(--gradient);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 30px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.5rem;
+            background: #e8f5e8;
+            border-radius: 10px;
+            margin: 1.5rem 0;
+            border-left: 4px solid var(--success);
+        }
+        
+        .file-details {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .file-details i {
+            color: var(--accent);
+            font-size: 1.5rem;
+        }
+        
+        .remove-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .remove-btn:hover {
+            background: #c0392b;
+            transform: rotate(90deg);
+        }
+        
+        .progress-container {
+            margin: 2rem 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: var(--light);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--success);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .extract-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+            width: 100%;
+            margin-top: 1rem;
+        }
+        
+        .extract-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+        }
+        
+        .extract-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .back-btn {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 30px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(-5px);
+        }
+        
+        .questions-list {
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 1rem 0;
+        }
+        
+        .question-item {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--secondary);
+            transition: all 0.3s ease;
+        }
+        
+        .question-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .question-number {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .question-text {
+            color: var(--dark);
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+        
+        .question-meta {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .meta-badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .type-badge {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .difficulty-badge {
+            background: var(--warning);
+            color: white;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #7f8c8d;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        @media (max-width: 768px) {
+            .parser-main {
+                grid-template-columns: 1fr;
+            }
+            
+            .parser-header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="parser-container">
+        <div class="parser-header">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <a href="index.html" class="back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Home
+                </a>
+                <div id="authSection">
+                    <!-- Auth section will be populated by JavaScript -->
+                </div>
+            </div>
+            <h1><i class="fas fa-file-pdf"></i> PDF Question Parser</h1>
+            <p>Extract and analyze questions from your PDF documents with AI-powered technology</p>
+        </div>
+        
+        <div class="parser-main">
+            <div class="upload-section">
+                <h2 class="section-title">
+                    <i class="fas fa-upload"></i>
+                    Upload PDF
+                </h2>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <i class="fas fa-file-pdf upload-icon"></i>
+                        <div class="upload-text">
+                            <h3>Drop your PDF here</h3>
+                            <p>or click to browse files</p>
+                            <p style="font-size: 0.9rem; opacity: 0.7;">Supports PDF files up to 10MB</p>
+                        </div>
+                        <input type="file" id="pdfFileInput" accept=".pdf" style="display: none;">
+                        <button class="upload-btn" onclick="document.getElementById('pdfFileInput').click()">
+                            <i class="fas fa-folder-open"></i> Choose PDF File
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <div class="file-details">
+                        <i class="fas fa-file-pdf"></i>
+                        <div>
+                            <div id="fileName" style="font-weight: 600;"></div>
+                            <div id="fileSize" style="font-size: 0.9rem; color: #7f8c8d;"></div>
+                        </div>
+                    </div>
+                    <button class="remove-btn" onclick="removeFile()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="progress-container" id="progressContainer" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div id="progressText" style="text-align: center; color: #7f8c8d;">Processing...</div>
+                </div>
+                
+                <button class="extract-btn" id="extractBtn" onclick="extractQuestions()" disabled>
+                    <i class="fas fa-magic"></i> Extract Questions
+                </button>
+            </div>
+            
+            <div class="results-section">
+                <h2 class="section-title">
+                    <i class="fas fa-list"></i>
+                    Extracted Questions
+                </h2>
+                
+                <div id="resultsContainer">
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <h3>No questions yet</h3>
+                        <p>Upload a PDF and extract questions to see results here</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="src/js/api.js"></script>
+    <script src="src/js/main.js"></script>
+</body>
+</html>

@@ -36,25 +36,25 @@ async function apiRequest(url, options = {}) {
 
 // Auth functions
 async function loginUser(email, password) {
-    return await apiRequest('/auth/login', {
+    return await apiRequest('/users/login', {
         method: 'POST',
         body: JSON.stringify({ email, password })
     });
 }
 
 async function registerUser(userData) {
-    return await apiRequest('/auth/register', {
+    return await apiRequest('/users/register', {
         method: 'POST',
         body: JSON.stringify(userData)
     });
 }
 
 async function getCurrentUser() {
-    return await apiRequest('/auth/me');
+    return await apiRequest('/users/me');
 }
 
 async function updateUserProfile(profileData) {
-    return await apiRequest('/auth/profile', {
+    return await apiRequest('/users/profile', {
         method: 'PUT',
         body: JSON.stringify(profileData)
     });
@@ -85,7 +85,7 @@ async function updateTest(testId, testData) {
 }
 
 async function deleteTest(testId) {
-    return await apiRequest(`/tests/${testId}`, {
+    return await apiRequest(`/ats/${testId}`, {
         method: 'DELETE'
     });
 }
@@ -98,7 +98,7 @@ async function extractQuestionsFromPDF(file) {
     const token = getToken();
     
     try {
-        const response = await fetch(`${API_BASE_URL}/questions/extract-pdf`, {
+        const response = await fetch(`${API_BASE_URL}/ats/extract-pdf`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -113,7 +113,7 @@ async function extractQuestionsFromPDF(file) {
 }
 
 async function createQuestion(questionData) {
-    return await apiRequest('/questions', {
+    return await apiRequest('/ats', {
         method: 'POST',
         body: JSON.stringify(questionData)
     });
@@ -121,7 +121,7 @@ async function createQuestion(questionData) {
 
 async function getQuestions(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    return await apiRequest(`/questions?${queryString}`);
+    return await apiRequest(`/ats?${queryString}`);
 }
 
 // Evaluation functions

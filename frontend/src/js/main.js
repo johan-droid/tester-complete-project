@@ -92,40 +92,80 @@ const roadmapData = [
 
 // Application State
 let currentUser = null;
-let authToken = null;
+let authToken = getToken(); // Initialize with token from localStorage
+
+// Token Management
+function getToken() {
+    return localStorage.getItem('tester_token');
+}
+
+function setToken(token) {
+    localStorage.setItem('tester_token', token);
+}
+
+function removeToken() {
+    localStorage.removeItem('tester_token');
+}
+
+function isAuthenticated() {
+    return !!getToken();
+}
+
+// Check authentication status on app load
+async function checkAuthOnLoad() {
+    const token = getToken();
+    if (token) {
+        try {
+            // Verify token and get user data
+            const userData = await verifyTokenAndGetUser();
+            if (userData) {
+                currentUser = userData;
+                authToken = token;
+                updateUIBasedOnAuth();
+            } else {
+                // Invalid token, clear it
+                removeToken();
+                currentUser = null;
+                authToken = null;
+            }
+        } catch (error) {
+            console.error('Error verifying token:', error);
+            removeToken();
+            currentUser = null;
+            authToken = null;
+        }
+    }
+    updateUIBasedOnAuth();
+}
 
 // DOM Content Loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    // Check authentication status first
+    await checkAuthOnLoad();
+    
+    // Initialize the rest of the app
     initializeApp();
+    
+    // Initialize event listeners
+    if (typeof initEventListeners === 'function') {
+        initEventListeners();
+    }
+    
+    // Initialize parser page functionality if on parser.html
+    if (window.location.pathname.includes('parser.html') || window.location.pathname.endsWith('/parser')) {
+        initializePDFUpload();
+    }
 });
 
 function initializeApp() {
-    // Check authentication status
-    checkAuthStatus();
-    
     // Load dynamic content
     loadFeatures();
     loadObjectives();
     loadTeam();
     loadRoadmap();
     
-    // Initialize event listeners
-    initEventListeners();
-    
     // Initialize animations
     initAnimations();
-    
-    // Update UI based on auth status
-    updateUIBasedOnAuth();
-}
-
-function checkAuthStatus() {
-    const token = getToken();
-    if (token) {
-        authToken = token;
-        // Verify token and get user data
-        verifyTokenAndGetUser();
-    }
 }
 
 async function verifyTokenAndGetUser() {
@@ -139,8 +179,7 @@ async function verifyTokenAndGetUser() {
         if (response.ok) {
             const data = await response.json();
             if (data.success) {
-                currentUser = data.data.user;
-                updateUIBasedOnAuth();
+                return data.data.user;
             }
         } else {
             // Token is invalid, remove it
@@ -158,16 +197,34 @@ async function verifyTokenAndGetUser() {
 
 function loadFeatures() {
     const featuresGrid = document.querySelector('.features-grid');
-    if (featuresGrid) {
-        featuresGrid.innerHTML = featuresData.map(feature => `
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <i class="${feature.icon}"></i>
+    
+    // If features grid doesn't exist on this page, exit gracefully
+    if (!featuresGrid) {
+        console.log('Features grid not found on this page');
+        return;
+    }
+
+    try {
+        const featuresHTML = featuresData.map(feature => {
+            const isPdfFeature = feature.title === 'PDF-based Question Extraction';
+            return `
+                <div class="feature-card ${isPdfFeature ? 'clickable-feature' : ''}" 
+                     ${isPdfFeature ? 'onclick="window.location.href=\'parser.html\'"' : ''}>
+                    <div class="feature-icon">
+                        <i class="${feature.icon}"></i>
+                    </div>
+                    <h3>${feature.title}</h3>
+                    <p>${feature.description}</p>
+                    ${isPdfFeature ? 
+                        '<button class="feature-btn" onclick="window.location.href=\'parser.html\'">Try Now</button>' : 
+                        ''}
                 </div>
-                <h3>${feature.title}</h3>
-                <p>${feature.description}</p>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+
+        featuresGrid.innerHTML = featuresHTML;
+    } catch (error) {
+        console.error('Error loading features:', error);
     }
 }
 
@@ -221,6 +278,39 @@ function loadRoadmap() {
             </div>
         `).join('');
     }
+}
+
+function initAnimations() {
+    // Initialize animations using Intersection Observer
+    if (!('IntersectionObserver' in window)) {
+        console.log('IntersectionObserver not supported, animations disabled');
+        return;
+    }
+
+    const animateOnScroll = (entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('animate__animated', 'animate__fadeInUp');
+                observer.unobserve(entry.target);
+            }
+        });
+    };
+
+    const observer = new IntersectionObserver(animateOnScroll, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    });
+
+    // Observe feature cards
+    document.querySelectorAll('.feature-card').forEach(card => {
+        observer.observe(card);
+    });
+
+    // Observe other elements that should animate
+    const animateElements = document.querySelectorAll('.animate-on-scroll');
+    animateElements.forEach(el => {
+        observer.observe(el);
+    });
 }
 
 function initEventListeners() {
@@ -372,10 +462,19 @@ async function handleLogin(e) {
         const result = await loginUser(email, password);
         
         if (result.success) {
+            console.log('Login successful!');
+            console.log('User data:', result.data.user);
+            console.log('Token received:', result.token);
+            
             showNotification('Login successful!', 'success');
             closeModals();
             currentUser = result.data.user;
             authToken = result.token;
+            setToken(authToken); // Store token in localStorage
+            
+            console.log('Token stored in localStorage:', getToken());
+            console.log('isAuthenticated() after login:', isAuthenticated());
+            
             updateUIBasedOnAuth();
             
             // Reset form
@@ -418,7 +517,10 @@ async function handleRegister(e) {
             showNotification('Registration successful!', 'success');
             closeModals();
             currentUser = result.data.user;
-            authToken = result.token;
+            if (result.token) {
+                authToken = result.token;
+                setToken(authToken); // Store token in localStorage
+            }
             updateUIBasedOnAuth();
             
             // Reset form
@@ -507,6 +609,25 @@ function handleLogout(e) {
         setTimeout(() => {
             window.location.reload();
         }, 1000);
+    }
+}
+
+// Global logout function for parser page
+function logout() {
+    // Clear user data and token
+    currentUser = null;
+    authToken = null;
+    removeToken();
+    
+    // Update UI
+    updateUIBasedOnAuth();
+    
+    // Force a full page reload to ensure all components reset
+    window.location.reload();
+    
+    // Redirect to home page if not already there
+    if (!window.location.href.includes('index.html') && !window.location.pathname.endsWith('/')) {
+        window.location.href = 'index.html';
     }
 }
 
@@ -752,6 +873,314 @@ function hideLoading() {
     document.body.classList.remove('loading-active');
 }
 
+// PDF Upload Functions
+function openPDFUploadModal() {
+    if (!currentUser) {
+        showNotification('Please login to use PDF extraction feature', 'warning');
+        showAuthModal('login');
+        return;
+    }
+    
+    const modal = document.getElementById('pdfUploadModal');
+    if (modal) {
+        modal.style.display = 'block';
+        document.body.classList.add('modal-open');
+        initializePDFUpload();
+    }
+}
+
+function closePDFUploadModal() {
+    const modal = document.getElementById('pdfUploadModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+        resetPDFUpload();
+    }
+}
+
+function initializePDFUpload() {
+    const fileInput = document.getElementById('pdfFileInput');
+    const uploadArea = document.getElementById('uploadArea');
+    
+    if (fileInput && uploadArea) {
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+    }
+}
+
+function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) {
+        handleFile(file);
+    }
+}
+
+function handleFile(file) {
+    if (file.type !== 'application/pdf') {
+        showNotification('Please upload a PDF file', 'error');
+        return;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+        showNotification('File size must be less than 10MB', 'error');
+        return;
+    }
+    
+    displayFileInfo(file);
+}
+
+function displayFileInfo(file) {
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const uploadArea = document.getElementById('uploadArea');
+    const extractBtn = document.getElementById('extractBtn');
+    
+    if (fileInfo && fileName && fileSize && uploadArea && extractBtn) {
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        
+        uploadArea.style.display = 'none';
+        fileInfo.style.display = 'flex';
+        extractBtn.disabled = false;
+    }
+}
+
+function removeFile() {
+    const fileInput = document.getElementById('pdfFileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadArea = document.getElementById('uploadArea');
+    const extractBtn = document.getElementById('extractBtn');
+    
+    if (fileInput) fileInput.value = '';
+    if (fileInfo) fileInfo.style.display = 'none';
+    if (uploadArea) uploadArea.style.display = 'block';
+    if (extractBtn) extractBtn.disabled = true;
+}
+
+function resetPDFUpload() {
+    removeFile();
+    const uploadProgress = document.getElementById('uploadProgress');
+    if (uploadProgress) uploadProgress.style.display = 'none';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+async function extractQuestions() {
+    const fileInput = document.getElementById('pdfFileInput');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showNotification('Please select a PDF file', 'error');
+        return;
+    }
+    
+    // Debug: Check authentication status
+    console.log('Auth check - Token exists:', !!getToken());
+    console.log('Auth check - Current user:', !!currentUser);
+    console.log('Auth check - isAuthenticated():', isAuthenticated());
+    
+    // Check if user is authenticated
+    if (!isAuthenticated()) {
+        showNotification('Please login to use PDF extraction feature', 'warning');
+        // Redirect to login or show login modal
+        if (typeof showAuthModal === 'function') {
+            showAuthModal('login');
+        } else {
+            // If on parser page, redirect to home page with login
+            window.location.href = 'index.html?login=true&redirect=parser.html';
+        }
+        return;
+    }
+    
+    try {
+        showUploadProgress();
+        
+        console.log('Starting PDF extraction...');
+        console.log('File:', file.name, file.size);
+        console.log('Token being sent:', getToken());
+        
+        const result = await window.TesterAPI.extractQuestionsFromPDF(file);
+        
+        console.log('Extraction result:', result);
+        
+        if (result.success) {
+            showNotification(
+                `Successfully extracted ${result.data.extractedCount} questions from PDF!`, 
+                'success'
+            );
+            closePDFUploadModal();
+            
+            if (result.data.questions && result.data.questions.length > 0) {
+                displayExtractedQuestions(result.data.questions);
+            }
+        } else {
+            showNotification(result.message || 'Failed to extract questions', 'error');
+        }
+    } catch (error) {
+        console.error('PDF extraction error:', error);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        if (error.message && error.message.includes('401')) {
+            showNotification('Authentication required. Please login again.', 'warning');
+            removeToken();
+            if (typeof showAuthModal === 'function') {
+                showAuthModal('login');
+            } else {
+                window.location.href = 'index.html?login=true&redirect=parser.html';
+            }
+        } else if (error.message && error.message.includes('Failed to fetch')) {
+            showNotification('Cannot connect to server. Please check if the backend is running on localhost:5000', 'error');
+        } else {
+            showNotification('Error extracting questions from PDF: ' + error.message, 'error');
+        }
+    } finally {
+        hideUploadProgress();
+    }
+}
+
+function showUploadProgress() {
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const extractBtn = document.getElementById('extractBtn');
+    
+    if (uploadProgress) uploadProgress.style.display = 'block';
+    if (extractBtn) extractBtn.disabled = true;
+    
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90;
+        
+        if (progressFill) progressFill.style.width = progress + '%';
+        if (progressText) progressText.textContent = `Processing PDF... ${Math.round(progress)}%`;
+        
+        if (progress >= 90) {
+            clearInterval(interval);
+            if (progressText) progressText.textContent = 'Extracting questions...';
+        }
+    }, 200);
+    
+    window.progressInterval = interval;
+}
+
+function hideUploadProgress() {
+    if (window.progressInterval) {
+        clearInterval(window.progressInterval);
+    }
+    
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const extractBtn = document.getElementById('extractBtn');
+    
+    if (progressContainer) progressContainer.style.display = 'none';
+    if (progressFill) progressFill.style.width = '0%';
+    if (progressText) progressText.textContent = 'Processing PDF...';
+    if (extractBtn) extractBtn.disabled = false;
+}
+
+function downloadQuestions(questions) {
+    const textContent = questions.map((q, index) => {
+        return `Question ${index + 1}\n${q.question || q.text || 'No question text available'}\nType: ${q.type || 'Unknown'}\nDifficulty: ${q.difficulty || 'Unknown'}\n---`;
+    }).join('\n\n');
+    
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'extracted-questions.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    showNotification('Questions downloaded successfully!', 'success');
+}
+
+function displayExtractedQuestions(questions) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    
+    if (resultsContainer) {
+        // Check if we're on the parser page
+        if (window.location.pathname.includes('parser.html') || window.location.pathname.endsWith('/parser')) {
+            resultsContainer.innerHTML = `
+                <div class="questions-list">
+                    ${questions.map((q, index) => `
+                        <div class="question-item">
+                            <div class="question-number">Question ${index + 1}</div>
+                            <div class="question-text">${q.question || q.text || 'No question text available'}</div>
+                            <div class="question-meta">
+                                <span class="meta-badge type-badge">${q.type || 'Unknown'}</span>
+                                <span class="meta-badge difficulty-badge">${q.difficulty || 'Unknown'}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="margin-top: 2rem; text-align: center;">
+                    <button class="extract-btn" onclick="downloadQuestions(${JSON.stringify(questions).replace(/"/g, '&quot;')})">
+                        <i class="fas fa-download"></i> Download Questions
+                    </button>
+                </div>
+            `;
+        } else {
+            // Original modal behavior for other pages
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content questions-modal">
+                    <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+                    <h2>Extracted Questions</h2>
+                    <div class="questions-list">
+                        ${questions.map((q, index) => `
+                            <div class="question-item">
+                                <h4>Question ${index + 1}</h4>
+                                <p>${q.question || q.text || 'No question text available'}</p>
+                                <div class="question-meta">
+                                    <span class="type">Type: ${q.type || 'Unknown'}</span>
+                                    <span class="difficulty">Difficulty: ${q.difficulty || 'Unknown'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn-primary" onclick="this.closest('.modal').remove()">Close</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            modal.style.display = 'block';
+        }
+    }
+}
+
 // Utility Functions
 function debounce(func, wait) {
     let timeout;
@@ -771,5 +1200,13 @@ window.TesterApp = {
     authToken,
     showNotification,
     showLoading,
-    hideLoading
+    hideLoading,
+    openPDFUploadModal,
+    closePDFUploadModal
 };
+
+// Make functions globally accessible
+window.openPDFUploadModal = openPDFUploadModal;
+window.closePDFUploadModal = closePDFUploadModal;
+window.extractQuestions = extractQuestions;
+window.removeFile = removeFile;
