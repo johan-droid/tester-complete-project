@@ -209,15 +209,12 @@ function loadFeatures() {
             const isPdfFeature = feature.title === 'PDF-based Question Extraction';
             return `
                 <div class="feature-card ${isPdfFeature ? 'clickable-feature' : ''}" 
-                     ${isPdfFeature ? 'onclick="window.location.href=\'parser.html\'"' : ''}>
+                     ${isPdfFeature ? 'onclick="window.location.href=\'parser.html\'" style="cursor: pointer;"' : ''}>
                     <div class="feature-icon">
                         <i class="${feature.icon}"></i>
                     </div>
                     <h3>${feature.title}</h3>
                     <p>${feature.description}</p>
-                    ${isPdfFeature ? 
-                        '<button class="feature-btn" onclick="window.location.href=\'parser.html\'">Try Now</button>' : 
-                        ''}
                 </div>
             `;
         }).join('');
