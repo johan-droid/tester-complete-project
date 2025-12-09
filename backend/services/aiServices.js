@@ -14,21 +14,13 @@ const safetySettings = [
     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-/**
- * Helper to clean and parse JSON from AI response
- * Fixes: Removes markdown code blocks which often cause parsing errors
- */
 function safeJSONParse(text) {
-    console.log("Raw AI Response:", text); // Debugging: See what AI actually sent
-    
-    // Remove markdown code blocks (```json ... ```)
+    console.log("Raw AI Response:", text); 
     const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
     try {
         return JSON.parse(cleanedText);
     } catch (e) {
         console.error("JSON Parse Error. Cleaned text was:", cleanedText);
-        // Fallback: Attempt to find array brackets if extra text exists
         const match = cleanedText.match(/\[[\s\S]*\]/);
         if (match) {
             try {
@@ -41,9 +33,6 @@ function safeJSONParse(text) {
     }
 }
 
-/**
- * Helper to chunk text to avoid token limits
- */
 function chunkText(text, chunkSize = 15000) {
     const chunks = [];
     for (let i = 0; i < text.length; i += chunkSize) {
@@ -52,14 +41,9 @@ function chunkText(text, chunkSize = 15000) {
     return chunks;
 }
 
-/**
- * Calls the AI to generate questions from a text chunk
- */
 async function callAIToExtractQuestions(textChunk, chunkIndex, totalChunks) {
     console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}...`);
-    
     try {
-        // Use gemini-1.5-flash for speed and lower cost (free tier friendly)
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", safetySettings });
         
         const prompt = `
@@ -107,11 +91,8 @@ class PDFService {
             let data = await pdf(dataBuffer);
             let text = data.text.trim();
 
-            // Check if PDF is text-readable (not just scanned images)
             if (text.length < 50) {
                 console.warn("Warning: PDF text is very short. It might be a scanned image.");
-                // If you had OCR setup, you would call it here. 
-                // For now, we return a warning question so the user knows.
                 return [{
                     question: "Error: The uploaded PDF appears to be a scanned image or empty. Please upload a text-based PDF.",
                     type: "short-answer",
@@ -125,14 +106,11 @@ class PDFService {
             const chunks = chunkText(text);
             console.log(`Split PDF into ${chunks.length} chunks.`);
 
-            // Process chunks in parallel
             const chunkPromises = chunks.map((chunk, index) => 
                 callAIToExtractQuestions(chunk, index, chunks.length)
             );
             
             const results = await Promise.all(chunkPromises);
-            
-            // Combine all questions
             const allQuestions = results.flat();
             
             if (allQuestions.length === 0) {
@@ -149,17 +127,8 @@ class PDFService {
     }
 }
 
-module.exports = PDFService;
-
-/**
- * Uses a Generative AI to evaluate a student's answer against a correct answer.
- * @param {string} studentAnswer - The text extracted from the student's submission.
- * @param {string} correctAnswer - The model answer from the database.
- * @returns {Promise<Object>} A promise resolving to an evaluation object.
- */
 async function callAIToEvaluate(studentAnswer, correctAnswer) {
     console.log('Sending answers to AI for evaluation...');
-    
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", safetySettings });
         
@@ -193,12 +162,10 @@ async function callAIToEvaluate(studentAnswer, correctAnswer) {
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
-        // Clean up the response to ensure it's valid JSON
         const jsonText = response.text().replace(/```json|```/g, '').trim();
         
         const evaluation = JSON.parse(jsonText);
         
-        // Add basic validation
         if (typeof evaluation.marks !== 'number' || typeof evaluation.isCorrect !== 'boolean') {
             throw new Error('Invalid JSON response from AI');
         }
@@ -206,7 +173,6 @@ async function callAIToEvaluate(studentAnswer, correctAnswer) {
 
     } catch (error) {
         console.error("Error calling AI for evaluation:", error);
-        // Fallback to a simple check in case AI fails
         return {
             isCorrect: studentAnswer.toLowerCase().includes(correctAnswer.toLowerCase().substring(0, 10)),
             marks: 0.0,
@@ -216,11 +182,9 @@ async function callAIToEvaluate(studentAnswer, correctAnswer) {
     }
 }
 
-
 class AIService {
     static async evaluateAnswer(studentAnswer, correctAnswer) {
         try {
-            // This now calls our new AI function
             const evaluation = await callAIToEvaluate(studentAnswer, correctAnswer);
             
             return {
@@ -234,11 +198,8 @@ class AIService {
         }
     }
 
-    // These functions are used for the Dashboard feature.
-    // They are simple but functional for now.
     static async identifyWeakAreas(answers) {
         const wrongAnswers = answers.filter(a => !a.isCorrect);
-        // 'answers.question' is the full question object from the controller fix
         const weakTopics = [...new Set(wrongAnswers.map(a => a.question.topic || 'Unknown'))];
         return weakTopics.slice(0, 3);
     }
@@ -267,4 +228,5 @@ class AIService {
     }
 }
 
-module.exports = AIService;
+// FIXED: Exporting both classes as an object
+module.exports = { PDFService, AIService };

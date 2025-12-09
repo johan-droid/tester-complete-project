@@ -1,5 +1,6 @@
 const Question = require('../models/Question');
 const PDFService = require('../services/pdfservices');
+const fs = require('fs');
 
 // --- 1. Create Question (Restored) ---
 exports.createQuestion = async (req, res) => {
@@ -61,11 +62,14 @@ exports.getQuestions = async (req, res) => {
     }
 };
 
-// --- 3. Extract from PDF (New Logic) ---
+// @route POST /api/questions/extract-pdf
+// @desc Extract questions from uploaded PDF
+// @access Private
 exports.extractQuestionsFromPDF = async (req, res) => {
     console.log("Received PDF extraction request");
 
     try {
+        // Validate file exists
         if (!req.file) {
             console.log("No file uploaded");
             return res.status(400).json({
@@ -79,37 +83,24 @@ exports.extractQuestionsFromPDF = async (req, res) => {
         // Extract questions using the service
         const questionsData = await PDFService.extractQuestions(req.file.path);
         
-        console.log(`Service returned ${questionsData.length} questions`);
+        if (!Array.isArray(questionsData)) {
+            throw new Error('Invalid response from PDF processing service');
+        }
 
-        // Save extracted questions to database
-        const savedQuestions = await Promise.all(
-            questionsData.map(async (qData) => {
-                const question = await Question.create({
-                    type: qData.type || 'short-answer',
-                    question: qData.question || 'No question text',
-                    options: qData.options || [],
-                    correctAnswer: qData.correctAnswer || 'N/A',
-                    difficulty: qData.difficulty || 'medium',
-                    subject: qData.subject || 'General',
-                    topic: qData.topic || 'General',
-                    marks: qData.marks || 1,
-                    createdBy: req.user.id,
-                    source: {
-                        pdfName: req.file.originalname,
-                        extractedText: qData.question
-                    }
-                });
-                return question;
-            })
-        );
+        console.log(`Successfully extracted ${questionsData.length} questions`);
 
-        res.status(200).json({
+        // Prepare response data
+        const response = {
             success: true,
             data: {
-                questions: savedQuestions,
-                extractedCount: savedQuestions.length
+                questions: questionsData,
+                extractedCount: questionsData.length
             }
-        });
+        };
+
+        // Send the response
+        res.status(200).json(response);
+
     } catch (error) {
         console.error("Controller Error:", error);
         res.status(500).json({
