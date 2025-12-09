@@ -209,15 +209,12 @@ function loadFeatures() {
             const isPdfFeature = feature.title === 'PDF-based Question Extraction';
             return `
                 <div class="feature-card ${isPdfFeature ? 'clickable-feature' : ''}" 
-                     ${isPdfFeature ? 'onclick="window.location.href=\'parser.html\'"' : ''}>
+                     ${isPdfFeature ? 'onclick="window.location.href=\'parser.html\'" style="cursor: pointer;"' : ''}>
                     <div class="feature-icon">
                         <i class="${feature.icon}"></i>
                     </div>
                     <h3>${feature.title}</h3>
                     <p>${feature.description}</p>
-                    ${isPdfFeature ? 
-                        '<button class="feature-btn" onclick="window.location.href=\'parser.html\'">Try Now</button>' : 
-                        ''}
                 </div>
             `;
         }).join('');
@@ -451,7 +448,6 @@ async function handleLogin(e) {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     
-    // Basic validation
     if (!email || !password) {
         showNotification('Please fill in all fields', 'error');
         return;
@@ -459,32 +455,34 @@ async function handleLogin(e) {
     
     try {
         showLoading('Logging in...');
-        const result = await loginUser(email, password);
+        
+        // Use the API wrapper which now points to the correct /api/auth/login
+        const result = await window.TesterAPI.loginUser(email, password);
         
         if (result.success) {
-            console.log('Login successful!');
-            console.log('User data:', result.data.user);
-            console.log('Token received:', result.token);
+            console.log('Login successful!', result);
+            
+            // ✅ CRITICAL FIX: Use 'tester_token' to match your getToken() function
+            localStorage.setItem('tester_token', result.token);
+            
+            // Update app state
+            window.TesterApp.authToken = result.token;
+            window.TesterApp.currentUser = result.data.user;
             
             showNotification('Login successful!', 'success');
             closeModals();
-            currentUser = result.data.user;
-            authToken = result.token;
-            setToken(authToken); // Store token in localStorage
             
-            console.log('Token stored in localStorage:', getToken());
-            console.log('isAuthenticated() after login:', isAuthenticated());
-            
+            // Force UI update
             updateUIBasedOnAuth();
             
-            // Reset form
-            e.target.reset();
+            // Reload page to ensure all auth states are fresh (optional but recommended for stability)
+            setTimeout(() => window.location.reload(), 1000);
         } else {
             showNotification(result.message || 'Login failed', 'error');
         }
     } catch (error) {
-        showNotification('Login error. Please try again.', 'error');
         console.error('Login error:', error);
+        showNotification('Login error. Please try again.', 'error');
     } finally {
         hideLoading();
     }

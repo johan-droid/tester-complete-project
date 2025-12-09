@@ -2,164 +2,190 @@
 
 const pdf = require('pdf-parse');
 const fs = require('fs');
+const path = require('path');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
-const OCRService = require('./ocrServices'); // Make sure to install the required OCR service
+const pdfPoppler = require('pdf-poppler');
 
 // --- AI Model Configuration ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY);
 
 const safetySettings = [
-    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
-/**
- * Helper to clean and parse JSON from AI response
- * Fixes Blind Spot B: "Happy Path" JSON Parsing
- */
-function safeJSONParse(text) {
+function cleanAndParseJSON(text) {
     try {
-        // Attempt direct parse
-        return JSON.parse(text);
-    } catch (e) {
-        // Fallback: Extract JSON array from text (removes markdown ```json ... ```)
-        const match = text.match(/\[[\s\S]*\]/);
-        if (match) {
-            try {
-                return JSON.parse(match[0]);
-            } catch (err) {
-                console.error("Failed to parse extracted JSON snippet:", err);
-            }
+        let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const firstBracket = clean.indexOf('[');
+        const lastBracket = clean.lastIndexOf(']');
+        if (firstBracket !== -1 && lastBracket !== -1) {
+            clean = clean.substring(firstBracket, lastBracket + 1);
+            return JSON.parse(clean);
         }
-        throw new Error('AI response could not be parsed as JSON');
-    }
-}
-
-/**
- * Helper to chunk text to avoid token limits
- * Fixes Blind Spot A: The "8000 Character" Data Loss
- */
-function chunkText(text, chunkSize = 10000) {
-    const chunks = [];
-    for (let i = 0; i < text.length; i += chunkSize) {
-        chunks.push(text.slice(i, i + chunkSize));
-    }
-    return chunks;
-}
-
-/**
- * Calls the AI to extract questions from a text chunk
- * @param {string} textChunk - The text chunk to process
- * @param {number} chunkIndex - The index of the current chunk
- * @param {number} totalChunks - Total number of chunks
- * @returns {Promise<Array>} Array of extracted questions
- */
-async function callAIToExtractQuestions(textChunk, chunkIndex, totalChunks) {
-    console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}...`);
-    
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", safetySettings });
-        
-        const prompt = `
-            You are an expert academic assistant. Analyze the following text extracted from part ${chunkIndex + 1} of ${totalChunks} of a document.
-            Extract all unique questions you can find. For each question, determine its type, difficulty, subject, topic, and options (if it's an MCQ).
-            
-            The question types must be one of: 'mcq', 'true-false', 'short-answer', 'descriptive'.
-            The difficulty must be one of: 'easy', 'medium', 'hard'.
-            
-            Return the result as a VALID JSON array of objects. If no questions are found in this specific text chunk, return an empty array [].
-            
-            FORMAT:
-            [
-              {
-                "question": "Question text?",
-                "type": "mcq",
-                "difficulty": "medium",
-                "subject": "Subject",
-                "topic": "Topic",
-                "options": [{ "text": "A", "isCorrect": true }, { "text": "B", "isCorrect": false }],
-                "marks": 1,
-                "correctAnswer": "A"
-              }
-            ]
-            
-            ---
-            TEXT CHUNK ${chunkIndex + 1} of ${totalChunks}:
-            ---
-            ${textChunk}
-        `;
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return safeJSONParse(response.text());
-
-    } catch (error) {
-        console.error(`Error processing chunk ${chunkIndex + 1}:`, error);
-        // Return empty array on error to allow other chunks to succeed
-        return []; 
+        return [];
+    } catch (e) {
+        console.error("JSON Parse Failed:", e.message);
+        return [];
     }
 }
 
 class PDFService {
+
+    /**
+     * Strategy 1: DIGITAL TEXT
+     */
+    static async processViaText(text) {
+        console.log("⚡ Strategy: Processing as Digital Text");
+        // FIXED: Used standard model name 'gemini-1.5-flash'
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash", 
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+            You are an expert teacher. Create a quiz based on the text below.
+            Input Text: ${text.substring(0, 30000)}
+            
+            REQUIREMENTS:
+            1. Generate 5-10 unique questions.
+            2. Vary difficulty (Easy, Medium, Hard).
+            3. Output strictly a JSON array.
+        `;
+
+        try {
+            const result = await model.generateContent(prompt);
+            return cleanAndParseJSON(result.response.text());
+        } catch (error) {
+            // FIXED: Added full error logging to debug console
+            console.error("Text Processing Error - Full Details:", error);
+            return []; // Return empty to trigger fallback to Vision
+        }
+    }
+
+    /**
+     * Strategy 2: VISION / IMAGE (Robust Poppler Method)
+     */
+    static async processViaVision(pdfPath) {
+        console.log("👁️ Strategy: Processing as Images (Vision - Poppler)");
+        
+        const outputDir = path.dirname(pdfPath);
+        const uniquePrefix = `img_${Date.now()}_`; 
+        
+        try {
+            const opts = {
+                format: 'jpeg',
+                out_dir: outputDir,
+                out_prefix: uniquePrefix,
+                page: null 
+            };
+
+            // 1. Convert PDF to Images
+            await pdfPoppler.convert(pdfPath, opts);
+
+            // 2. Scan directory for the generated images
+            const files = fs.readdirSync(outputDir);
+            const imageFiles = files.filter(file => file.startsWith(uniquePrefix) && file.endsWith('.jpg'));
+
+            if (imageFiles.length === 0) {
+                console.warn("Poppler ran but no image files were found. Ensure poppler-utils is installed on the server.");
+                return [];
+            }
+
+            // Limit to first 3 images to save AI token costs
+            const imagesToProcess = imageFiles.slice(0, 3);
+            const imageParts = [];
+
+            for (const file of imagesToProcess) {
+                const fullPath = path.join(outputDir, file);
+                const buffer = fs.readFileSync(fullPath);
+                
+                imageParts.push({
+                    inlineData: {
+                        data: buffer.toString('base64'),
+                        mimeType: "image/jpeg"
+                    }
+                });
+
+                // Cleanup immediately
+                try { fs.unlinkSync(fullPath); } catch(e) {}
+            }
+
+            // Cleanup remaining images if any
+            imageFiles.slice(3).forEach(file => {
+                try { fs.unlinkSync(path.join(outputDir, file)); } catch(e) {}
+            });
+
+            // 3. Send to Gemini
+            // FIXED: Used standard model name 'gemini-1.5-flash'
+            const model = genAI.getGenerativeModel({ 
+                model: "gemini-1.5-flash",
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const prompt = `
+                Analyze these exam paper images.
+                Extract 5 to 8 practice questions from the visible content.
+                Ignore watermarks. Return valid JSON array.
+            `;
+
+            const result = await model.generateContent([prompt, ...imageParts]);
+            return cleanAndParseJSON(result.response.text());
+
+        } catch (error) {
+            console.error("Vision Processing Error:", error);
+            return [];
+        }
+    }
+
+    /**
+     * Main Entry Point
+     */
     static async extractQuestions(pdfPath) {
         try {
             const dataBuffer = fs.readFileSync(pdfPath);
-            let data = await pdf(dataBuffer);
-            let text = data.text.trim();
+            const data = await pdf(dataBuffer);
+            const text = data.text.trim();
 
-            // --- FIX: Scanned PDF / OCR Fallback ---
-            // If text is very short/empty, it's likely a scanned image PDF.
-            if (text.length < 50) {
-                console.log("Text layer empty. Attempting OCR...");
-                
-                // NOTE: To make this work fully, you need a library like 'pdf-img-convert' 
-                // to convert the PDF pages to image buffers/files first.
-                // Since I cannot install packages for you, this is the logic flow:
-                
-                /* const pdf2pic = require('pdf-img-convert'); // You would need to install this
-                const imageBuffers = await pdf2pic.convert(pdfPath);
-                
-                // Process images with your existing OCRService
-                const ocrResults = await Promise.all(
-                    imageBuffers.map(async (buffer, index) => {
-                        // Save buffer to temp file or modify OCRService to accept buffers
-                        const tempPath = `temp_page_${index}.png`;
-                        fs.writeFileSync(tempPath, buffer);
-                        const pageText = await OCRService.extractText(tempPath);
-                        fs.unlinkSync(tempPath); // Clean up
-                        return pageText;
-                    })
-                );
-                text = ocrResults.join(' ');
-                */
-                
-                // If you don't have the conversion library yet, throw a clear error
-                if (text.length === 0) {
-                     throw new Error("This appears to be a scanned PDF. Please install 'pdf-img-convert' to enable OCR features.");
-                }
+            let questions = [];
+
+            // Decision Logic
+            if (text.length > 100) {
+                questions = await this.processViaText(text);
+            }
+            
+            // If Text failed (returned empty array), try Vision
+            if (!questions || questions.length === 0) {
+                console.log("⚠️ Text extraction failed or yielded 0 questions. Switching to Vision...");
+                questions = await this.processViaVision(pdfPath);
             }
 
-            // --- FIX: Chunking & Parallel Processing ---
-            const chunks = chunkText(text);
-            console.log(`Split PDF into ${chunks.length} chunks.`);
+            // Final check
+            if (!questions || questions.length === 0) {
+                return [{
+                    question: "We could not extract questions. Please check server logs for API errors.",
+                    type: "short-answer",
+                    difficulty: "easy",
+                    subject: "Error",
+                    topic: "System",
+                    marks: 0
+                }];
+            }
 
-            // Process chunks in parallel (be mindful of API rate limits)
-            const chunkPromises = chunks.map((chunk, index) => 
-                callAIToExtractQuestions(chunk, index, chunks.length)
-            );
-            
-            const results = await Promise.all(chunkPromises);
-            
-            // Flatten the array of arrays into a single list of questions
-            const allQuestions = results.flat();
-            
-            console.log(`Extracted total of ${allQuestions.length} questions.`);
-            return allQuestions;
+            return questions;
 
         } catch (error) {
-            throw new Error(`PDF processing error: ${error.message}`);
+            console.error("PDF Service Fatal Error:", error);
+            return [{
+                question: `Error: ${error.message}`,
+                type: "short-answer",
+                difficulty: "easy",
+                subject: "Error",
+                topic: "System",
+                marks: 0
+            }];
         }
     }
 }

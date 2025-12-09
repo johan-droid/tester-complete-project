@@ -2,9 +2,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure upload directories exist
-const uploadDirs = ['uploads/pdfs', 'uploads/images'];
-uploadDirs.forEach(dir => {
+// Define absolute path to backend/uploads
+const uploadRoot = path.join(__dirname, '../uploads');
+const pdfDir = path.join(uploadRoot, 'pdfs');
+const imgDir = path.join(uploadRoot, 'images');
+
+// Ensure upload directories exist using absolute paths
+[uploadRoot, pdfDir, imgDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
@@ -13,7 +17,7 @@ uploadDirs.forEach(dir => {
 // PDF upload configuration
 const pdfStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/pdfs/');
+        cb(null, pdfDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -38,7 +42,7 @@ const pdfUpload = multer({
 // Image upload configuration
 const imageStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/images/');
+        cb(null, imgDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -60,6 +64,7 @@ const imageUpload = multer({
     }
 });
 
+// IMPORTANT: Exporting the .single() middleware functions directly
 module.exports = {
     pdfUpload: pdfUpload.single('pdf'),
     imageUpload: imageUpload.single('image')
