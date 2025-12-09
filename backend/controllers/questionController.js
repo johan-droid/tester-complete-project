@@ -1,6 +1,7 @@
 const Question = require('../models/Question');
 const PDFService = require('../services/pdfservices');
 
+// --- 1. Create Question (Restored) ---
 exports.createQuestion = async (req, res) => {
     try {
         const question = await Question.create({
@@ -23,6 +24,7 @@ exports.createQuestion = async (req, res) => {
     }
 };
 
+// --- 2. Get Questions (Restored) ---
 exports.getQuestions = async (req, res) => {
     try {
         const { page = 1, limit = 10, type, difficulty, subject, topic, tags } = req.query;
@@ -59,26 +61,42 @@ exports.getQuestions = async (req, res) => {
     }
 };
 
+// --- 3. Extract from PDF (New Logic) ---
 exports.extractQuestionsFromPDF = async (req, res) => {
+    console.log("Received PDF extraction request");
+
     try {
         if (!req.file) {
+            console.log("No file uploaded");
             return res.status(400).json({
                 success: false,
                 message: 'Please upload a PDF file'
             });
         }
 
-        const questions = await PDFService.extractQuestions(req.file.path);
+        console.log(`Processing file: ${req.file.path}`);
+
+        // Extract questions using the service
+        const questionsData = await PDFService.extractQuestions(req.file.path);
         
+        console.log(`Service returned ${questionsData.length} questions`);
+
         // Save extracted questions to database
         const savedQuestions = await Promise.all(
-            questions.map(async (questionData) => {
+            questionsData.map(async (qData) => {
                 const question = await Question.create({
-                    ...questionData,
+                    type: qData.type || 'short-answer',
+                    question: qData.question || 'No question text',
+                    options: qData.options || [],
+                    correctAnswer: qData.correctAnswer || 'N/A',
+                    difficulty: qData.difficulty || 'medium',
+                    subject: qData.subject || 'General',
+                    topic: qData.topic || 'General',
+                    marks: qData.marks || 1,
                     createdBy: req.user.id,
                     source: {
                         pdfName: req.file.originalname,
-                        extractedText: questionData.question
+                        extractedText: qData.question
                     }
                 });
                 return question;
@@ -93,9 +111,10 @@ exports.extractQuestionsFromPDF = async (req, res) => {
             }
         });
     } catch (error) {
+        console.error("Controller Error:", error);
         res.status(500).json({
             success: false,
-            message: 'Error extracting questions from PDF',
+            message: 'Error extracting questions: ' + error.message,
             error: error.message
         });
     }

@@ -17,7 +17,6 @@ const imgDir = path.join(uploadRoot, 'images');
 // PDF upload configuration
 const pdfStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Save to absolute path backend/uploads/pdfs
         cb(null, pdfDir);
     },
     filename: (req, file, cb) => {
@@ -43,7 +42,6 @@ const pdfUpload = multer({
 // Image upload configuration
 const imageStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Save to absolute path backend/uploads/images
         cb(null, imgDir);
     },
     filename: (req, file, cb) => {
@@ -66,6 +64,7 @@ const imageUpload = multer({
     }
 });
 
+// IMPORTANT: Exporting the .single() middleware functions directly
 module.exports = {
     pdfUpload: pdfUpload.single('pdf'),
     imageUpload: imageUpload.single('image')
